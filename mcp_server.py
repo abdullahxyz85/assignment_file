@@ -14,10 +14,14 @@ How it works:
 
 import asyncio
 import json
+import sys
+import traceback
 from typing import Any
 
 # Import the MCP server framework
-from mcp import Server, types
+import mcp
+from mcp.server import Server
+from mcp.types import Tool, TextContent
 
 # Import our configuration and WordPress API
 from config import validate_config
@@ -45,7 +49,7 @@ server = Server("wordpress-mcp")
 # ============================================
 
 @server.list_tools()
-async def list_tools() -> list[types.Tool]:
+async def list_tools() -> list[Tool]:
     """
     Define all available tools that AI agents can use.
     
@@ -64,7 +68,7 @@ async def list_tools() -> list[types.Tool]:
     """
     
     # Tool 1: List Posts
-    list_posts_tool = types.Tool(
+    list_posts_tool = Tool(
         name="list_posts",
         description="Get all WordPress posts from the blog",
         inputSchema={
@@ -85,7 +89,7 @@ async def list_tools() -> list[types.Tool]:
     )
     
     # Tool 2: Create Post
-    create_post_tool = types.Tool(
+    create_post_tool = Tool(
         name="create_post",
         description="Create a new WordPress post",
         inputSchema={
@@ -110,7 +114,7 @@ async def list_tools() -> list[types.Tool]:
     )
     
     # Tool 3: Manage Plugins
-    manage_plugins_tool = types.Tool(
+    manage_plugins_tool = Tool(
         name="manage_plugins",
         description="List plugins or manage (activate/deactivate/delete) a specific plugin",
         inputSchema={
@@ -131,7 +135,7 @@ async def list_tools() -> list[types.Tool]:
     )
     
     # Tool 4: List Users
-    list_users_tool = types.Tool(
+    list_users_tool = Tool(
         name="list_users",
         description="Get all WordPress users with their roles and emails",
         inputSchema={
@@ -141,7 +145,7 @@ async def list_tools() -> list[types.Tool]:
     )
     
     # Tool 5: Get Site Statistics
-    get_site_stats_tool = types.Tool(
+    get_site_stats_tool = Tool(
         name="get_site_stats",
         description="Get WordPress site health, version info, and statistics",
         inputSchema={
@@ -308,41 +312,50 @@ async def call_tool(name: str, arguments: dict) -> Any:
 
 async def main():
     """
-    Main function that starts the MCP server.
+    Main function that starts the MCP server on stdio.
     
-    Steps:
-    1. Validate that all credentials are configured
-    2. Print startup message
-    3. Start the server listening on stdio
+    The server listens for JSON-RPC messages from stdin and sends responses to stdout.
     """
     
     # Validate credentials before starting
     try:
         validate_config()
     except ValueError as e:
-        print(f"Configuration error: {e}")
-        return
+        print(f"❌ Configuration error: {e}", file=sys.stderr)
+        sys.exit(1)
     
-    # Print startup message
-    print("🚀 WordPress MCP Server Starting...")
-    print("📻 Listening for AI agent connections on stdio...")
+    # Print startup message to stderr so it doesn't interfere with MCP communication
+    print("🚀 WordPress MCP Server Starting...", file=sys.stderr)
+    print("📻 Listening for AI agent connections on stdio...", file=sys.stderr)
+    print("✅ Server is ready! Waiting for requests...", file=sys.stderr)
     
     try:
-        # Start the server
-        # This will block and listen for incoming requests from AI agents
-        async with server:
-            print("✅ Server is ready! Waiting for requests...")
-            # Keep the server running
-            await server.wait()
-    
+        # Set up the stdio transport and connect the server
+        async with mcp.stdio_server() as (read_stream, write_stream):
+            print("📡 Connected to MCP client", file=sys.stderr)
+            
+            # Get initialization options and run the server
+            init_options = server.create_initialization_options()
+            await server.run(
+                read_stream,
+                write_stream,
+                init_options,
+                raise_exceptions=False
+            )
+        
     except KeyboardInterrupt:
-        print("\n❌ Server stopped by user")
+        print("\n❌ Server stopped by user", file=sys.stderr)
+    except ExceptionGroup as eg:
+        print(f"❌ Server error group:", file=sys.stderr)
+        for exc in eg.exceptions:
+            print(f"   - {type(exc).__name__}: {exc}", file=sys.stderr)
     except Exception as e:
-        print(f"❌ Server error: {e}")
+        print(f"❌ Server error: {type(e).__name__}: {e}", file=sys.stderr)
+        traceback.print_exc(file=sys.stderr)
     finally:
-        # Clean up resources
-        print("🧹 Cleaning up...")
+        print("🧹 Cleaning up...", file=sys.stderr)
         await close_api()
+        print("✅ Server stopped", file=sys.stderr)
 
 
 # ============================================
