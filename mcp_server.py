@@ -49,7 +49,7 @@ server = Server("wordpress-mcp")
 # ============================================
 
 @server.list_tools()
-async def list_tools() -> list[Tool]:
+async def list_tools () -> list[Tool]:
     """
     Define all available tools that AI agents can use.
     

@@ -1,28 +1,8 @@
-"""
-WordPress API Wrapper Module
-=============================
-This module handles all communication with the WordPress REST API.
-It provides functions to interact with posts, plugins, users, and site health.
-Think of it as the "translator" between our MCP server and WordPress.
-"""
-
 import httpx
 from config import WORDPRESS_API_BASE, WP_CORE_API_BASE, get_auth_header, WORDPRESS_HTTPS
 from typing import Optional, List, Dict, Any
 
-# ============================================
-# INITIALIZE HTTP CLIENT
-# ============================================
-
-# Create an async HTTP client that we'll use for all requests
-# timeout=30.0 means if WordPress doesn't respond in 30 seconds, we give up
-# verify=True means we verify SSL certificates (HTTPS security)
 client = httpx.AsyncClient(timeout=30.0, verify=WORDPRESS_HTTPS)
-
-
-# ============================================
-# HELPER FUNCTION: Make API Requests
-# ============================================
 
 async def make_request(
     method: str,
